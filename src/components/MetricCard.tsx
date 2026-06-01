@@ -6,7 +6,7 @@ interface MetricCardProps {
   value: string | number;
   subtitle?: string;
   icon?: ReactNode;
-  variant?: 'default' | 'spending' | 'savings' | 'primary';
+  variant?: 'default' | 'spending' | 'savings' | 'primary' | 'warning';
   delay?: number;
 }
 
@@ -26,6 +26,7 @@ export function MetricCard({
     spending: 'bg-spending/[0.07]',
     savings: 'bg-savings/[0.07]',
     primary: 'bg-primary/[0.07]',
+    warning: 'bg-warning/[0.07]',
   }[variant];
 
   const valueColor = {
@@ -33,6 +34,7 @@ export function MetricCard({
     spending: 'text-spending',
     savings: 'text-savings',
     primary: 'text-primary',
+    warning: 'text-warning',
   }[variant];
 
   const iconWrap = {
@@ -40,6 +42,7 @@ export function MetricCard({
     spending: 'bg-spending/15 text-spending',
     savings: 'bg-savings/15 text-savings',
     primary: 'bg-primary/15 text-primary',
+    warning: 'bg-warning/15 text-warning',
   }[variant];
 
   return (

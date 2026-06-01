@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CreditCard, TrendingDown, Calendar, Store, Repeat, Wallet, TrendingUp } from 'lucide-react';
+import { CreditCard, TrendingDown, Calendar, Store, Repeat, Wallet, TrendingUp, BarChart2 } from 'lucide-react';
 import { Transaction, ViewMode } from '@/types/transaction';
 import { MetricCard } from './MetricCard';
 import { ViewToggle } from './ViewToggle';
@@ -33,6 +33,7 @@ import {
   calculateTotalSpending,
   calculateStandingOrdersTotal,
   calculateIncomeTotal,
+  calculateInvestmentTotal,
   countIncomeTransactions,
   getTopMerchant,
   getWeeklyBreakdown,
@@ -113,6 +114,11 @@ export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChang
     [filteredTransactions, recurringMerchants]
   );
 
+  const investmentTotal = useMemo(() =>
+    calculateInvestmentTotal(filteredTransactions),
+    [filteredTransactions]
+  );
+
   // Chart data
   const weeklyData = useMemo(() => 
     getWeeklyBreakdown(filteredTransactions, selectedMonth, selectedYear),
@@ -188,7 +194,7 @@ export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChang
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="סה״כ הוצאות"
           value={totalSpending}
@@ -207,15 +213,22 @@ export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChang
                 : `${incomeCount} זיכויים`
           }
           icon={<TrendingUp className="h-5 w-5" />}
-          variant="primary"
+          variant="savings"
           delay={50}
+        />
+        <MetricCard
+          title="השקעות"
+          value={investmentTotal}
+          icon={<BarChart2 className="h-5 w-5" />}
+          variant="warning"
+          delay={100}
         />
         <MetricCard
           title="הוראות קבע"
           value={standingOrdersTotal}
           icon={<Repeat className="h-5 w-5" />}
-          variant="savings"
-          delay={100}
+          variant="primary"
+          delay={150}
         />
       </div>
 

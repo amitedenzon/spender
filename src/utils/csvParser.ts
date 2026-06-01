@@ -30,8 +30,10 @@ export function parseCSV(csvContent: string): Transaction[] {
   const idxInfo = colMap.has('פירוט נוסף') ? colMap.get('פירוט נוסף')! : 8;
 
   const startIndex = headerRowIndex >= 0 ? headerRowIndex + 1 : 0;
-  // We can still use the raw content lines for the quick header date extraction as that's usually at the top
-  const statementDate = extractStatementDate(csvContent.split('\n'));
+
+  // Per-key counter so identical (date+merchant+amount) rows get distinct, stable
+  // indices — matching the scraper's indexCounter in isracard-fetch.js.
+  const indexCounter = new Map<string, number>();
 
   for (let i = startIndex; i < rows.length; i++) {
     const columns = rows[i];
@@ -53,24 +55,23 @@ export function parseCSV(csvContent: string): Transaction[] {
     // Skip if no valid date
     if (!dateStr || !dateStr.match(/\d{2}\.\d{2}\.\d{2}/)) continue;
 
-    let purchaseDate = parseHebrewDate(dateStr);
+    const origPurchaseDate = parseHebrewDate(dateStr);
+    let purchaseDate = origPurchaseDate;
     const chargeAmount = parseNumber(chargeAmountStr);
-    
+
     if (isNaN(purchaseDate.getTime()) || isNaN(chargeAmount)) continue;
 
     const installments = parseInstallments(columns);
 
-    // If it's an installment transaction
+    // Shift installment transactions to their actual billing month, matching
+    // postProcessTransaction in server/scrapers/postProcess.js. Never override
+    // with the CSV header's billing month — the purchase date + (N-1) months
+    // gives the same billing month and keeps purchaseDate accurate.
     if (installments) {
-        if (statementDate) {
-            purchaseDate = statementDate;
-        } else {
-            const d = new Date(purchaseDate);
-            d.setMonth(d.getMonth() + installments.current - 1);
-            purchaseDate = d;
-        }
+      const d = new Date(purchaseDate);
+      d.setMonth(d.getMonth() + installments.current - 1);
+      purchaseDate = d;
     }
-
 
     // Clean up "Standing Order" text from additional info to avoid duplication
     let cleanedInfo = additionalInfo?.trim() || '';
@@ -80,14 +81,21 @@ export function parseCSV(csvContent: string): Transaction[] {
 
     const category = categorizeMerchant(merchantName, cleanedInfo);
 
-    // Statement date drives month-grouping: every row in this CSV belongs to the
-    // statement-file's due-date month. Fallback when no header date was detected:
-    // first-of-month of purchaseDate.
-    const rowStatementDate = statementDate
-      ?? new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), 1);
+    // Group by purchase month (matching scraper behaviour). Do NOT use the
+    // CSV header's billing month — that would put May purchases into June.
+    const rowStatementDate = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth(), 1);
+
+    // ID uses the ORIGINAL purchase date (before installment shift) + per-key
+    // counter, matching normalizeIsracardRow in server/scrapers/isracard-fetch.js
+    // so that the same transaction doesn't appear twice when both scraping and
+    // CSV upload are active.
+    const idIso = origPurchaseDate.toISOString();
+    const idKey = `${idIso}|${merchantName}|${chargeAmount}`;
+    const idx = indexCounter.get(idKey) ?? 0;
+    indexCounter.set(idKey, idx + 1);
 
     const transaction: Transaction = {
-      id: `${purchaseDate.toISOString()}-${merchantName}-${chargeAmount}-${i}`,
+      id: `${idIso}-${merchantName}-${chargeAmount}-${idx}`,
       purchaseDate,
       statementDate: rowStatementDate,
       merchantName: merchantName?.trim() || 'לא ידוע',
@@ -161,13 +169,16 @@ function parseHebrewDate(dateStr: string): Date {
   const day = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10) - 1; // 0-indexed
   let year = parseInt(parts[2], 10);
-  
+
   // Handle 2-digit year
   if (year < 100) {
     year += year > 50 ? 1900 : 2000;
   }
 
-  return new Date(year, month, day);
+  // Use noon to avoid UTC date-shift: midnight local time (e.g. UTC+3) converts
+  // to the previous day in ISO strings, making IDs differ from the scraper
+  // which also uses local noon via parseHebDate.
+  return new Date(year, month, day, 12, 0, 0);
 }
 
 function parseNumber(str: string): number {

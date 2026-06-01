@@ -68,7 +68,10 @@ async function fillIfPresent(page, selectors, value) {
 
 async function detectLoggedIn(page) {
   const url = page.url();
+  // Old site personal area (pre-OTP redirect)
   if (DASHBOARD_URL_PATTERN.test(url) && !/Login/i.test(url)) return true;
+  // New site — after OTP Isracard redirects here; any page that isn't a login/auth page
+  if (/web\.isracard\.co\.il/i.test(url) && !/\/login|\/auth|\/identity/i.test(url)) return true;
   // Title-based fallback — Isracard's dashboard sets <title>אזור אישי | ישראכרט</title>
   // even on URLs that aren't obviously /personalarea/Main/.
   try {
@@ -94,7 +97,10 @@ export async function loginIsracardForCard(label, credentials) {
 
   let page;
   try {
-    page = (await browser.pages())[0] || await browser.newPage();
+    // Open a fresh blank page for the login flow rather than taking over one
+    // of the session-restored tabs. The profile's cookies are shared across
+    // all pages, so a new page is still authenticated if cookies are valid.
+    page = await browser.newPage();
 
     // Cloudflare anti-bot: the page detects headless Chromium via a script
     // called `detector-dom.min.js` and a "HeadlessChrome" user-agent. The
@@ -137,9 +143,20 @@ export async function loginIsracardForCard(label, credentials) {
       await delay(800);
     }
 
-    // Now wait for the password form's ID input to be ready.
+    // Wait for ANY visible login input — password form (#otpLoginId_ID) or
+    // SMS-first form (#otpLobbyFormSms inputs). The older UI needed #flip to
+    // switch to the password form; the newer site may show SMS form by default
+    // without a flip link, so we accept either.
     try {
-      await page.waitForSelector('#otpLoginId_ID', { visible: true, timeout: 15_000 });
+      await page.waitForFunction(() => {
+        const pwdId = document.querySelector('#otpLoginId_ID');
+        if (pwdId && pwdId.getBoundingClientRect().width > 0) return true;
+        const smsInputs = document.querySelectorAll('#otpLobbyFormSms input');
+        for (const el of smsInputs) {
+          if (el.getBoundingClientRect().width > 0) return true;
+        }
+        return false;
+      }, { timeout: 15_000 });
     } catch {
       const title = await page.title().catch(() => '');
       if (/cloudflare|attention required/i.test(title)) {
@@ -150,16 +167,25 @@ export async function loginIsracardForCard(label, credentials) {
         setMessage(`${label}: כבר מחובר`);
         return browser;
       }
-      throw new Error(`Password form's ID input didn't appear (title: "${title}").`);
+      const url = page.url();
+      throw new Error(`Login form didn't appear (url: "${url}", title: "${title}").`);
     }
 
     setMessage(`${label}: מזין פרטי התחברות`);
+    // Try password form first; fall back to SMS form inputs.
     const idSel = await fillIfPresent(page, [
       '#otpLoginId_ID',
       'input[name="otpLoginId_ID"]',
       '#otpLobbyFormPassword input[type="tel"][maxlength="9"]',
+      '#otpLobbyFormSms input[type="tel"]',
+      '#otpLobbyFormSms input',
     ], credentials.id);
 
+    if (!idSel) {
+      throw new Error(`Could not find ID input on Isracard login page (url: "${page.url()}").`);
+    }
+
+    // card6 and password only exist on the password form; absent on SMS flow.
     const card6Sel = await fillIfPresent(page, [
       '#cardnum',
       'input[name="otpLoginLastDigits_ID"]',
@@ -170,10 +196,6 @@ export async function loginIsracardForCard(label, credentials) {
       'input[name="otpLoginPwd"]',
       'input[type="password"]',
     ], credentials.password);
-
-    if (!idSel || !card6Sel || !pwdSel) {
-      throw new Error(`Could not find login fields on Isracard page (id=${!!idSel} card=${!!card6Sel} pwd=${!!pwdSel}).`);
-    }
 
     setMessage(`${label}: שולח טופס התחברות`);
     await page.keyboard.press('Enter');
@@ -198,12 +220,13 @@ export async function loginIsracardForCard(label, credentials) {
         setMessage(`${label}: התחברות הצליחה`);
         return browser;
       }
-      // 4-digit OTP grid — visible AND not inside the SMS form (which keeps
-      // those inputs in the DOM even when its tab is hidden).
+      // 4-digit OTP grid — visible inputs only. We no longer exclude
+      // #otpLobbyFormSms because Isracard may render 2FA OTP inside that
+      // same container on the current version of the site; visibility
+      // filtering is sufficient to ignore hidden SMS-login inputs.
       const digits = await page.$$eval(
         'input[type="tel"][maxlength="1"], input[type="text"][maxlength="1"], input[type="number"][maxlength="1"]',
         els => els
-          .filter(e => !e.closest('#otpLobbyFormSms'))
           .filter(e => {
             const r = e.getBoundingClientRect();
             return r.width > 0 && r.height > 0;
@@ -215,7 +238,6 @@ export async function loginIsracardForCard(label, credentials) {
       const single = await page.evaluateHandle(() => {
         const candidates = document.querySelectorAll('input[autocomplete="one-time-code"]');
         for (const el of candidates) {
-          if (el.closest('#otpLobbyFormSms')) continue;
           const r = el.getBoundingClientRect();
           if (r.width > 0 && r.height > 0) return el;
         }

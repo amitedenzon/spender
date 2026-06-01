@@ -134,7 +134,7 @@ async function scrapeIsracardAll(indexCounter) {
     await warmUpTransactionsPage(page);
 
     const allCards = await fetchCardList(page);
-    const activeCards = allCards.filter(c => c.cardStatus === '0' && c.isActive);
+    const activeCards = allCards.filter(c => String(c.cardStatus) === '0' && c.isActive);
     // If user specified card6 values, filter to those; otherwise take all active.
     const cardsToScrape = allowedLast4.size > 0
       ? activeCards.filter(c => allowedLast4.has(c.cardSuffix))

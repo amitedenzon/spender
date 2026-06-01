@@ -9,7 +9,9 @@ function expensesOnly(transactions: Transaction[]): Transaction[] {
 }
 
 export function calculateTotalSpending(transactions: Transaction[]): number {
-  return expensesOnly(transactions).reduce((sum, t) => sum + t.chargeAmount, 0);
+  return expensesOnly(transactions)
+    .filter(t => t.category !== 'השקעות')
+    .reduce((sum, t) => sum + t.chargeAmount, 0);
 }
 
 // Sum of all credits in the period (returned as a positive number).
@@ -28,6 +30,12 @@ export function countIncomeTransactions(transactions: Transaction[]): number {
 export function calculateDailyAverage(transactions: Transaction[], daysInPeriod: number): number {
   const total = calculateTotalSpending(transactions);
   return daysInPeriod > 0 ? total / daysInPeriod : 0;
+}
+
+export function calculateInvestmentTotal(transactions: Transaction[]): number {
+  return expensesOnly(transactions)
+    .filter(t => t.category === 'השקעות')
+    .reduce((sum, t) => sum + t.chargeAmount, 0);
 }
 
 export function calculateStandingOrdersTotal(
