@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, ArrowUpDown, Calendar, Store, CreditCard, Repeat, Sparkles, Loader2 } from 'lucide-react';
+import { Search, ArrowUpDown, Calendar, Store, CreditCard, Repeat, Sparkles, Loader2, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,12 +20,13 @@ interface TransactionTableProps {
   transactions: Transaction[];
   onCategoryChange: (id: string, newCategory: string) => void;
   onBatchCategoryChange?: (merchantCategoryMap: Map<string, string>) => void;
+  onHide?: (id: string) => void;
 }
 
 type SortField = 'date' | 'merchant' | 'amount';
 type SortDirection = 'asc' | 'desc';
 
-export function TransactionTable({ transactions, onCategoryChange, onBatchCategoryChange }: TransactionTableProps) {
+export function TransactionTable({ transactions, onCategoryChange, onBatchCategoryChange, onHide }: TransactionTableProps) {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -193,18 +194,19 @@ export function TransactionTable({ transactions, onCategoryChange, onBatchCatego
                 </div>
               </TableHead>
               <TableHead className="text-right">פירוט</TableHead>
+              {onHide && <TableHead className="w-8" />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredAndSorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={onHide ? 6 : 5} className="text-center py-8 text-muted-foreground">
                   לא נמצאו עסקאות
                 </TableCell>
               </TableRow>
             ) : (
               filteredAndSorted.map((t) => (
-                <TableRow key={t.id} className="hover:bg-muted/30 transition-colors">
+                <TableRow key={t.id} className="group hover:bg-muted/30 transition-colors">
                   <TableCell className="font-medium tabular-nums">
                     {formatDate(t.purchaseDate)}
                   </TableCell>
@@ -250,6 +252,19 @@ export function TransactionTable({ transactions, onCategoryChange, onBatchCatego
                       </Badge>
                     )}
                   </TableCell>
+                  {onHide && (
+                    <TableCell className="w-8 p-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                        onClick={() => onHide(t.id)}
+                        title="הסתר עסקה"
+                      >
+                        <EyeOff className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
