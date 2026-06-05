@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -122,6 +122,11 @@ const App = () => {
   // The latest period is computed once data lands and only ever pre-warmed
   // once — subsequent fetches require an explicit refresh.
   const prefetchedRef = useRef(false);
+
+  const visibleTransactions = useMemo(
+    () => transactions.filter(t => !hiddenIds.has(t.id)),
+    [transactions, hiddenIds]
+  );
 
   useEffect(() => {
     if (prefetchedRef.current) return;
@@ -345,17 +350,17 @@ const App = () => {
                   />
                   <Route
                     path="/monitor"
-                    element={<Monitor transactions={transactions} onCategoryChange={handleCategoryChange} onBatchCategoryChange={handleBatchCategoryChange} />}
+                    element={<Monitor transactions={visibleTransactions} onCategoryChange={handleCategoryChange} onBatchCategoryChange={handleBatchCategoryChange} onHideTransaction={handleHideTransaction} />}
                   />
                   <Route
                     path="/recurring"
-                    element={<RecurringPaymentsPage transactions={transactions} />}
+                    element={<RecurringPaymentsPage transactions={visibleTransactions} />}
                   />
                   <Route
                     path="/statistics"
-                    element={<Statistics transactions={transactions} insightsStore={insightsStore} />}
+                    element={<Statistics transactions={visibleTransactions} insightsStore={insightsStore} />}
                   />
-                  <Route path="/data" element={<DataManagement />} />
+                  <Route path="/data" element={<DataManagement transactions={transactions} hiddenIds={hiddenIds} onRestoreTransaction={handleRestoreTransaction} />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                </div>
