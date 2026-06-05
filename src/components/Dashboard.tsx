@@ -52,6 +52,7 @@ interface DashboardProps {
   transactions: Transaction[];
   onCategoryChange: (id: string, newCategory: string) => void;
   onBatchCategoryChange?: (merchantCategoryMap: Map<string, string>) => void;
+  onHideTransaction?: (id: string) => void;
 }
 
 const HEBREW_MONTHS = [
@@ -59,7 +60,7 @@ const HEBREW_MONTHS = [
   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
 ];
 
-export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChange }: DashboardProps) {
+export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChange, onHideTransaction }: DashboardProps) {
   const availableYears = useMemo(() => getAvailableYears(transactions), [transactions]);
   const [selectedYear, setSelectedYear] = useState(availableYears[0] || new Date().getFullYear());
   
@@ -333,6 +334,7 @@ export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChang
         transactions={filteredTransactions}
         onCategoryChange={onCategoryChange}
         onBatchCategoryChange={onBatchCategoryChange}
+        onHide={onHideTransaction}
       />
 
       <DayDetailDialog

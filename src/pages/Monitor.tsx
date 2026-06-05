@@ -8,9 +8,10 @@ interface MonitorProps {
   transactions: Transaction[];
   onCategoryChange: (id: string, newCategory: string) => void;
   onBatchCategoryChange?: (merchantCategoryMap: Map<string, string>) => void;
+  onHideTransaction?: (id: string) => void;
 }
 
-const Monitor = ({ transactions, onCategoryChange, onBatchCategoryChange }: MonitorProps) => {
+const Monitor = ({ transactions, onCategoryChange, onBatchCategoryChange, onHideTransaction }: MonitorProps) => {
   const navigate = useNavigate();
 
   if (transactions.length === 0) {
@@ -29,7 +30,12 @@ const Monitor = ({ transactions, onCategoryChange, onBatchCategoryChange }: Moni
   }
 
   return (
-    <Dashboard transactions={transactions} onCategoryChange={onCategoryChange} onBatchCategoryChange={onBatchCategoryChange} />
+    <Dashboard
+      transactions={transactions}
+      onCategoryChange={onCategoryChange}
+      onBatchCategoryChange={onBatchCategoryChange}
+      onHideTransaction={onHideTransaction}
+    />
   );
 };
 
