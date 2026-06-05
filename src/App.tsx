@@ -95,9 +95,19 @@ const migrateStoredOverrides = () => {
   }
 };
 
+const loadHiddenIds = (): Set<string> => {
+  try {
+    const saved = localStorage.getItem('hidden_transactions');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
 const App = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(loadHiddenIds);
 
   // Lifted out of the Statistics page so the cache survives navigation and the
   // boot-time prefetch can pre-warm the latest period before the user clicks in.
@@ -282,6 +292,32 @@ const App = () => {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  const handleHideTransaction = useCallback((id: string) => {
+    setHiddenIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem('hidden_transactions', JSON.stringify([...next]));
+      } catch (e) {
+        console.error('Failed to save hidden transactions', e);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleRestoreTransaction = useCallback((id: string) => {
+    setHiddenIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      try {
+        localStorage.setItem('hidden_transactions', JSON.stringify([...next]));
+      } catch (e) {
+        console.error('Failed to save hidden transactions', e);
+      }
+      return next;
+    });
   }, []);
 
   return (
