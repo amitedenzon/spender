@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Download, FileText, Database } from "lucide-react";
+import { Trash2, Download, FileText, Database, Eye, ChevronDown } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,9 +19,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Transaction } from "@/types/transaction";
 
 interface FileData {
   name: string;
@@ -30,9 +36,18 @@ interface FileData {
   lastModified: string;
 }
 
-export default function DataManagement() {
+interface DataManagementProps {
+  transactions: Transaction[];
+  hiddenIds: Set<string>;
+  onRestoreTransaction: (id: string) => void;
+}
+
+export default function DataManagement({ transactions, hiddenIds, onRestoreTransaction }: DataManagementProps) {
   const [files, setFiles] = useState<FileData[]>([]);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [isHiddenOpen, setIsHiddenOpen] = useState(false);
+
+  const hiddenTransactions = transactions.filter(t => hiddenIds.has(t.id));
 
   const fetchFiles = async () => {
     try {
@@ -167,6 +182,59 @@ export default function DataManagement() {
           </TableBody>
         </Table>
       </div>
+
+      {hiddenTransactions.length > 0 && (
+        <Collapsible open={isHiddenOpen} onOpenChange={setIsHiddenOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground w-full justify-start px-0"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${isHiddenOpen ? 'rotate-180' : ''}`} />
+              <span>עסקאות מוסתרות</span>
+              <Badge variant="secondary" className="tabular-nums">{hiddenTransactions.length}</Badge>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="bg-card rounded-lg overflow-hidden mt-2">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-right">תאריך</TableHead>
+                    <TableHead className="text-right">בית עסק</TableHead>
+                    <TableHead className="text-right">סכום</TableHead>
+                    <TableHead className="text-center w-[80px]">שחזור</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {hiddenTransactions.map(t => (
+                    <TableRow key={t.id} className="hover:bg-muted/40 transition-colors opacity-60">
+                      <TableCell className="tabular-nums text-sm">
+                        {t.purchaseDate.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      </TableCell>
+                      <TableCell>{t.merchantName}</TableCell>
+                      <TableCell className="tabular-nums text-sm">
+                        {t.chargeAmount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-primary"
+                          onClick={() => onRestoreTransaction(t.id)}
+                          title="שחזר עסקה"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
 
       <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !open && setFileToDelete(null)}>
         <AlertDialogContent>
