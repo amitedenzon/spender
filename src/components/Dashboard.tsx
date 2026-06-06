@@ -72,6 +72,7 @@ export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChang
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [pieMode, setPieMode] = useState<'time' | 'category'>('category');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   // Filtered transactions based on view mode and category
@@ -136,10 +137,38 @@ export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChang
     [transactions, selectedYear]
   );
 
-  const trendData = useMemo(() => 
-    getMonthlyTrend(transactions, selectedYear),
-    [transactions, selectedYear]
+  const trendData = useMemo(() =>
+    getMonthlyTrend(filteredTransactions, selectedYear),
+    [filteredTransactions, selectedYear]
   );
+
+  const allCategoriesTrendData = useMemo(() => {
+    if (!showAllCategories || viewMode !== 'year') return null;
+    const COLORS = [
+      'hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
+      'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--chart-6))',
+      'hsl(var(--chart-1) / 0.6)', 'hsl(var(--chart-2) / 0.6)',
+    ];
+    const yearTx = transactions.filter(t =>
+      t.statementDate.getFullYear() === selectedYear && t.chargeAmount > 0
+    );
+    const catTotals = new Map<string, number>();
+    yearTx.forEach(t => catTotals.set(t.category, (catTotals.get(t.category) || 0) + t.chargeAmount));
+    const categories = [...catTotals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name], i) => ({ name, color: COLORS[i % COLORS.length] }));
+    const hebrewMonths = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+    const data = hebrewMonths.map((month, idx) => {
+      const row: Record<string, number | string> = { month };
+      categories.forEach(({ name }) => {
+        row[name] = yearTx
+          .filter(t => t.statementDate.getMonth() === idx && t.category === name)
+          .reduce((s, t) => s + t.chargeAmount, 0);
+      });
+      return row;
+    });
+    return { data, categories };
+  }, [transactions, selectedYear, showAllCategories, viewMode]);
 
   const categoryData = useMemo(() => 
     getCategoryBreakdown(filteredTransactions),
@@ -276,11 +305,22 @@ export function Dashboard({ transactions, onCategoryChange, onBatchCategoryChang
           <>
             <ChartCard
               title="מגמת הוצאות"
-              subtitle="התפתחות ההוצאות לאורך השנה"
+              subtitle={selectedCategory !== 'all' && !showAllCategories ? `קטגוריה: ${selectedCategory}` : "התפתחות ההוצאות לאורך השנה"}
               delay={250}
               className="lg:col-span-6"
+              action={
+                <button
+                  onClick={() => setShowAllCategories(v => !v)}
+                  className={`text-xs px-2 py-1 rounded-md border transition-colors ${showAllCategories ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'}`}
+                >
+                  כל הקטגוריות
+                </button>
+              }
             >
-              <TrendLineChart data={trendData} />
+              {allCategoriesTrendData
+                ? <TrendLineChart data={trendData} multiData={allCategoriesTrendData.data} categories={allCategoriesTrendData.categories} />
+                : <TrendLineChart data={trendData} />
+              }
             </ChartCard>
 
             <ChartCard
